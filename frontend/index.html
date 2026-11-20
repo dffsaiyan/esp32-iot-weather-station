@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enderwood IoT Weather Station — Dashboard</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+  <link rel="icon" href="favicon.ico" sizes="any">
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Chart.js CDN for real-time spline chart -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Reusable Pixel-Grid Double Chevron Symbol -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display: none;" aria-hidden="true">
+    <symbol id="pixelArrowPair" viewBox="0 0 24 15">
+      <rect x="0.25" y="0.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="3.25" y="0.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="3.25" y="3.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="6.25" y="3.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="6.25" y="6.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="9.25" y="6.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="3.25" y="9.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="6.25" y="9.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="0.25" y="12.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="3.25" y="12.25" width="2.5" height="2.5" fill="currentColor"/>
+
+      <rect x="12.25" y="0.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="15.25" y="0.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="15.25" y="3.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="18.25" y="3.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="18.25" y="6.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="21.25" y="6.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="15.25" y="9.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="18.25" y="9.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="12.25" y="12.25" width="2.5" height="2.5" fill="currentColor"/>
+      <rect x="15.25" y="12.25" width="2.5" height="2.5" fill="currentColor"/>
+    </symbol>
+  </svg>
+
+  <main class="page-shell">
+
+    <!-- =========================================================
+         SECTION 1: HERO CANVAS (Spartan-AI Inspired Layout)
+         ========================================================= -->
+    <section class="hero-canvas">
+      <img src="spartan_hero_bg.png" alt="Weather Station Meadow Horizon" class="hero-bg-img">
+      <div class="hero-top-fade" aria-hidden="true"></div>
+
+      <!-- Top Bar -->
+      <header class="hero-topbar">
+        <a href="#" class="brand-pill" title="Enderwood Weather Station">
+          <span class="brand-logo-wrap">
+            <img src="logo.jpg" alt="Enderwood Logo" class="brand-logo-img">
+          </span>
+          <span class="brand-name">Enderwood</span>
+        </a>
+
+        <div class="topbar-right">
+          <div class="clock-pill" id="currentTime">--:--:--</div>
+          <button type="button" class="action-pill" id="settingsBtn" title="Cài đặt & Thông số kết nối">
+            <span class="action-pill-icon" aria-hidden="true">
+              <span class="pixel-window pixel-window-sm">
+                <span class="pixel-track">
+                  <svg class="pixel-svg" viewBox="0 0 24 15"><use href="#pixelArrowPair"/></svg>
+                  <svg class="pixel-svg" viewBox="0 0 24 15"><use href="#pixelArrowPair"/></svg>
+                </span>
+              </span>
+            </span>
+            <span class="action-pill-text">Cài đặt</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Middle Hero Content -->
+      <div class="hero-main">
+        <!-- Left: Two-Tone Headline + Short Description + Split CTA -->
+        <div class="hero-copy">
+          <h1 class="hero-title">
+            <span class="title-muted">Enderwood Station.</span>
+            <span class="title-strong">Sense in real time.</span>
+          </h1>
+
+          <p class="hero-desc">
+            Theo dõi nhiệt độ, độ ẩm và ánh sáng từ ESP32 qua EMQX MQTT và lưu trữ lịch sử tự động bằng SQLite.
+          </p>
+
+          <div class="hero-cta-wrap">
+            <a href="#telemetry" class="btn-split-cta is-disabled" id="viewDataBtn" aria-disabled="true">
+              <span class="btn-split-icon" aria-hidden="true">
+                <span class="pixel-window">
+                  <span class="pixel-track">
+                    <svg class="pixel-svg" viewBox="0 0 24 15"><use href="#pixelArrowPair"/></svg>
+                    <svg class="pixel-svg" viewBox="0 0 24 15"><use href="#pixelArrowPair"/></svg>
+                  </span>
+                </span>
+              </span>
+              <span class="btn-split-text">Xem dữ liệu</span>
+            </a>
+
+            <div class="status-card" id="connectionStatusCard" role="status" aria-live="polite" title="Trạng thái dữ liệu từ ESP32">
+              <div class="status-meta">
+                <span class="status-label">Trạng thái</span>
+                <span class="status-value" id="connectionStatusText">Offline</span>
+              </div>
+              <span class="status-icon" id="connectionStatusIcon" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 20h.01"/>
+                  <path d="M8.5 16.429a5 5 0 0 1 7 0"/>
+                  <path d="M5 12.859a10 10 0 0 1 5.17-2.69"/>
+                  <path d="M19 12.859a10 10 0 0 0-2.007-1.523"/>
+                  <path d="M2 8.82a15 15 0 0 1 4.177-2.643"/>
+                  <path d="M22 8.82a15 15 0 0 0-11.288-3.764"/>
+                  <path d="m2 2 20 20"/>
+                </svg>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Compact Floating Status Card -->
+        <div class="mini-module-card">
+          <div class="mini-card-screen">
+            <video class="mini-card-video" src="spartan_model_loop.mp4" autoplay loop muted playsinline></video>
+
+            <div class="mini-screen-top">
+              <span class="mono-label">ESP32-DEV</span>
+            </div>
+          </div>
+
+          <div class="mini-card-caption">
+            <div>
+              <div class="mini-card-title">System Health</div>
+              <div class="mini-card-sub">Mô hình trạm đo thời tiết</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Hero Marquee Strip -->
+      <div class="hero-bottom-strip">
+        <div class="hero-marquee" aria-label="Thành phần hệ thống">
+          <div class="hero-marquee-track">
+            <div class="marquee-group">
+              <span class="marquee-item">ESP32-DevKit</span>
+              <span class="marquee-sep" aria-hidden="true">•</span>
+              <span class="marquee-item">DHT11 Sensor</span>
+              <span class="marquee-sep" aria-hidden="true">•</span>
+              <span class="marquee-item">LDR Light</span>
+              <span class="marquee-sep" aria-hidden="true">•</span>
+              <span class="marquee-item">OLED SSD1306</span>
+              <span class="marquee-sep" aria-hidden="true">•</span>
+              <span class="marquee-item">EMQX MQTT</span>
+              <span class="marquee-sep" aria-hidden="true">•</span>
+              <span class="marquee-item">Flask REST API</span>
+              <span class="marquee-sep" aria-hidden="true">•</span>
+              <span class="marquee-item">SQLite Storage</span>
+              <span class="marquee-sep" aria-hidden="true">•</span>
+              <span class="marquee-item">USB WiFi Setup</span>
+              <span class="marquee-sep" aria-hidden="true">•</span>
+            </div>
+            <div class="marquee-group" aria-hidden="true">
+              <span class="marquee-item">ESP32-DevKit</span>
+              <span class="marquee-sep">•</span>
+              <span class="marquee-item">DHT11 Sensor</span>
+              <span class="marquee-sep">•</span>
+              <span class="marquee-item">LDR Light</span>
+              <span class="marquee-sep">•</span>
+              <span class="marquee-item">OLED SSD1306</span>
+              <span class="marquee-sep">•</span>
+              <span class="marquee-item">EMQX MQTT</span>
+              <span class="marquee-sep">•</span>
+              <span class="marquee-item">Flask REST API</span>
+              <span class="marquee-sep">•</span>
+              <span class="marquee-item">SQLite Storage</span>
+              <span class="marquee-sep">•</span>
+              <span class="marquee-item">USB WiFi Setup</span>
+              <span class="marquee-sep">•</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         LOWER SECTIONS WRAPPER (Camp Enderwood Backdrop)
+         ========================================================= -->
+    <div class="enderwood-backdrop-section is-locked" id="lowerSections">
+      <div class="enderwood-scrim" aria-hidden="true"></div>
+
+      <!-- =========================================================
+           SECTION 2: CLEAN TELEMETRY BENTO CARDS
+           ========================================================= -->
+      <div class="section-toolbar">
+        <button type="button" class="buzzer-pill is-locked" id="buzzerBtn" aria-disabled="true" title="Công tắc điều khiển còi báo động trên ESP32">
+          <span class="buzzer-left">
+            <span class="buzzer-icon" id="buzzerIcon" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5"/>
+                <path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/>
+                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+                <path d="m2 2 20 20"/>
+              </svg>
+            </span>
+            <span class="buzzer-meta">
+              <span class="buzzer-title">Còi báo động</span>
+              <span class="buzzer-sub" id="buzzerSub">Chỉ mở khi Nguy hiểm</span>
+            </span>
+          </span>
+          <span class="ios-switch" aria-hidden="true">
+            <span class="ios-knob"></span>
+          </span>
+        </button>
+      </div>
+
+      <section id="telemetry" class="kpi-grid">
+
+        <!-- Card 1: Temperature -->
+        <article class="bento-card">
+          <div class="card-head">
+            <span class="card-label">Nhiệt độ</span>
+            <div class="card-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
+              </svg>
+            </div>
+          </div>
+
+          <div class="card-metric">
+            <span class="metric-number" id="tempValue">29.4</span>
+            <span class="metric-unit">°C</span>
+          </div>
+
+          <div class="card-progress-wrap">
+            <div class="progress-track">
+              <div class="progress-fill" id="tempGaugeBar" style="width: 48%;"></div>
+            </div>
+            <div class="card-foot-row">
+              <span>Cảnh báo: ≥ 33°C</span>
+              <span>Nguy hiểm: ≥ 37°C</span>
+            </div>
+          </div>
+        </article>
+
+        <!-- Card 2: Humidity -->
+        <article class="bento-card">
+          <div class="card-head">
+            <span class="card-label">Độ ẩm</span>
+            <div class="card-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+              </svg>
+            </div>
+          </div>
+
+          <div class="card-metric">
+            <span class="metric-number" id="humValue">72</span>
+            <span class="metric-unit">%</span>
+          </div>
+
+          <div class="card-progress-wrap">
+            <div class="progress-track">
+              <div class="progress-fill progress-fill-blue" id="humGaugeBar" style="width: 72%;"></div>
+            </div>
+            <div class="card-foot-row">
+              <span>Cảnh báo: ≥ 76%</span>
+              <span>Nguy hiểm: ≥ 85%</span>
+            </div>
+          </div>
+        </article>
+
+        <!-- Card 3: Light Intensity & System Health -->
+        <article class="bento-card">
+          <div class="card-head">
+            <span class="card-label">Ánh sáng &amp; Hệ thống</span>
+            <div class="card-icon" id="lightIconBox" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="4"/>
+                <path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+              </svg>
+            </div>
+          </div>
+
+          <div class="light-health-row">
+            <div>
+              <div class="light-value" id="lightValue">Sáng</div>
+            </div>
+            <div class="status-stack">
+              <span class="status-stack-caption">Trạng thái chung</span>
+              <div class="status-text-only status-normal" id="statusPill">
+                <span id="statusPillText">Ổn định</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-foot-row">
+            <span id="statusSubtext">Tất cả thông số ở mức an toàn</span>
+            <span>GPIO 34</span>
+          </div>
+        </article>
+
+      </section>
+
+      <!-- =========================================================
+           SECTION 3: DARK CHART BLOCK
+           ========================================================= -->
+      <section id="chart-section" class="dark-chart-panel">
+        <div class="chart-header">
+          <div>
+            <span class="card-label">Theo dõi thời gian thực</span>
+            <h2 class="section-heading section-heading-dark">Biến thiên Nhiệt độ &amp; Độ ẩm</h2>
+          </div>
+
+          <div class="chart-legend">
+            <div class="legend-item">
+              <span class="legend-dot dot-temp"></span>
+              <span>Nhiệt độ (°C)</span>
+            </div>
+            <div class="legend-item legend-item-muted">
+              <span class="legend-dot dot-hum"></span>
+              <span>Độ ẩm (%)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="chart-surface">
+          <div class="chart-canvas-container">
+            <canvas id="realtimeSplineChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========================================================
+           SECTION 4: MYSQL LOG TABLE
+           ========================================================= -->
+      <section id="history-section" class="bento-card table-panel">
+        <div class="log-header">
+          <div>
+            <span class="card-label">Dữ liệu lưu trữ</span>
+            <h2 class="section-heading">Lịch sử cảm biến gần nhất</h2>
+            <div class="log-count" id="logRecordCount">0 bản ghi</div>
+          </div>
+
+          <button type="button" class="btn-refresh" id="refreshHistoryBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+              <path d="M21 3v5h-5"/>
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+              <path d="M8 16H3v5"/>
+            </svg>
+            <span>Làm mới dữ liệu</span>
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Thời gian ghi nhận</th>
+                <th>Nhiệt độ</th>
+                <th>Độ ẩm</th>
+                <th>Ánh sáng</th>
+                <th>Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody id="sensorDataLogBody">
+              <tr>
+                <td colspan="6" class="text-center loading-row">Đang tải lịch sử dữ liệu...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer class="page-footer">
+        <span>Dự án IoT Nhóm 6 — Trạm thời tiết ESP32 &amp; Flask</span>
+      </footer>
+    </div>
+
+  </main>
+
+  <!-- Settings Modal (ESP32 USB WiFi Setup) -->
+  <div id="settingsModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h3 id="settingsModalTitle" class="modal-title">Kết nối WiFi cho ESP32</h3>
+          <p class="modal-subtitle">Tự động nhận mạch qua USB, xem trạng thái &amp; đổi WiFi 2.4GHz</p>
+        </div>
+        <button type="button" class="modal-close" id="closeSettingsBtn" aria-label="Đóng">✕</button>
+      </div>
+
+      <div class="wifi-current-card hidden" id="wifiCurrentCard">
+        <div class="wifi-current-info">
+          <div class="wifi-current-label">Đang kết nối WiFi</div>
+          <div class="wifi-current-ssid" id="wifiCurrentSsid">—</div>
+          <div class="wifi-current-meta" id="wifiCurrentMeta">IP: —</div>
+        </div>
+        <button type="button" class="wifi-disconnect-btn" id="wifiDisconnectBtn">Ngắt kết nối</button>
+      </div>
+
+      <div class="wifi-box">
+        <div class="wifi-box-head">
+          <div class="wifi-device-line">
+            <span id="wifiDeviceStatus">Đang tìm mạch ESP32...</span>
+            <span class="wifi-count-text" id="wifiCountLabel"></span>
+          </div>
+          <button type="button" class="wifi-scan-btn" id="wifiScanBtn">Quét lại</button>
+        </div>
+
+        <div class="wifi-list" id="wifiList">
+          <div class="wifi-empty">Bấm Quét lại để tìm mạng WiFi xung quanh mạch</div>
+        </div>
+      </div>
+
+      <div class="wifi-password-section hidden" id="wifiPasswordSection">
+        <div class="wifi-pass-label">
+          Mật khẩu cho <strong id="selectedSsidLabel"></strong>
+        </div>
+        <div class="wifi-pass-row">
+          <div class="wifi-pass-input-wrap">
+            <input type="password" id="wifiPassInput" class="wifi-pass-input" placeholder="Nhập mật khẩu WiFi..." autocomplete="off">
+            <button type="button" id="toggleWifiPassBtn" class="wifi-pass-toggle">Hiện</button>
+          </div>
+          <button type="button" id="wifiConnectBtn" class="wifi-connect-btn">Kết nối</button>
+        </div>
+      </div>
+
+      <div class="wifi-feedback hidden" id="wifiFeedbackBox"></div>
+    </div>
+  </div>
+
+  <!-- JavaScript App Logic -->
+  <script src="app.js"></script>
+</body>
+</html>

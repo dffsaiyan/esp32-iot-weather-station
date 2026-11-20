@@ -1,4 +1,4 @@
 #pragma once
 
-#define WIFI_SSID_VALUE     "Vu Tiem"
-#define WIFI_PASSWORD_VALUE "0975750765"
+// Thong tin Wi-Fi khong luu cung trong ma nguon.
+// Thiet bi nhan Wi-Fi tam thoi tren RAM qua cong USB Serial tu giao dien web.
