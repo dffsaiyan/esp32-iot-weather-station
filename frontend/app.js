@@ -91,6 +91,13 @@ const elRefreshHistoryBtn = document.getElementById('refreshHistoryBtn');
 const elSettingsBtn = document.getElementById('settingsBtn');
 const elSettingsModal = document.getElementById('settingsModal');
 const elCloseSettingsBtn = document.getElementById('closeSettingsBtn');
+const elOpenMobileQrBtn = document.getElementById('openMobileQrBtn');
+const elMobileQrModal = document.getElementById('mobileQrModal');
+const elCloseMobileQrBtn = document.getElementById('closeMobileQrBtn');
+const elMobileQrBox = document.getElementById('mobileQrBox');
+const elMobileQrUrl = document.getElementById('mobileQrUrl');
+const elRefreshQrBtn = document.getElementById('refreshQrBtn');
+const elCopyMobileUrlBtn = document.getElementById('copyMobileUrlBtn');
 const elWifiCurrentCard = document.getElementById('wifiCurrentCard');
 const elWifiCurrentSsid = document.getElementById('wifiCurrentSsid');
 const elWifiCurrentMeta = document.getElementById('wifiCurrentMeta');
@@ -136,11 +143,39 @@ function formatChartTime(isoTimestamp) {
   ].join(':');
 }
 
+function applyChartResponsiveOptions() {
+  if (!chartInstance) return;
+  const isMobile = window.innerWidth <= 640;
+  const tickFontSize = isMobile ? 10.5 : 12.5;
+  const tickPadding = isMobile ? 4 : 8;
+
+  chartInstance.data.datasets[0].borderWidth = isMobile ? 2 : 2.5;
+  chartInstance.data.datasets[0].pointRadius = isMobile ? 2.2 : 3.5;
+  chartInstance.data.datasets[1].borderWidth = isMobile ? 2 : 2.2;
+  chartInstance.data.datasets[1].pointRadius = isMobile ? 2.2 : 3.5;
+
+  chartInstance.options.layout.padding.left = isMobile ? 0 : 6;
+  chartInstance.options.layout.padding.right = isMobile ? 0 : 6;
+
+  chartInstance.options.scales.x.ticks.maxTicksLimit = isMobile ? 4 : 8;
+  chartInstance.options.scales.x.ticks.padding = tickPadding;
+  chartInstance.options.scales.x.ticks.font.size = tickFontSize;
+
+  chartInstance.options.scales.yTemp.ticks.padding = tickPadding;
+  chartInstance.options.scales.yTemp.ticks.font.size = tickFontSize;
+
+  chartInstance.options.scales.yHum.ticks.padding = tickPadding;
+  chartInstance.options.scales.yHum.ticks.font.size = tickFontSize;
+}
+
 function initSplineChart() {
   if (typeof Chart === 'undefined') {
     return;
   }
 
+  const isMobile = window.innerWidth <= 640;
+  const tickFontSize = isMobile ? 10.5 : 12.5;
+  const tickPadding = isMobile ? 4 : 8;
   const ctx = document.getElementById('realtimeSplineChart').getContext('2d');
 
   // Gradient for Temperature (Crisp White)
@@ -163,14 +198,14 @@ function initSplineChart() {
           yAxisID: 'yTemp',
           data: [],
           borderColor: '#ffffff',
-          borderWidth: 2.5,
+          borderWidth: isMobile ? 2 : 2.5,
           backgroundColor: tempGradient,
           fill: true,
           tension: 0.35,
           pointBackgroundColor: '#ffffff',
           pointBorderColor: '#0e0e0e',
           pointBorderWidth: 1.5,
-          pointRadius: 3.5,
+          pointRadius: isMobile ? 2.2 : 3.5,
           pointHoverRadius: 6,
         },
         {
@@ -178,14 +213,14 @@ function initSplineChart() {
           yAxisID: 'yHum',
           data: [],
           borderColor: '#38bdf8',
-          borderWidth: 2.2,
+          borderWidth: isMobile ? 2 : 2.2,
           backgroundColor: humGradient,
           fill: true,
           tension: 0.35,
           pointBackgroundColor: '#38bdf8',
           pointBorderColor: '#0e0e0e',
           pointBorderWidth: 1.5,
-          pointRadius: 3.5,
+          pointRadius: isMobile ? 2.2 : 3.5,
           pointHoverRadius: 6,
         }
       ]
@@ -222,8 +257,8 @@ function initSplineChart() {
       },
       layout: {
         padding: {
-          left: 6,
-          right: 6,
+          left: isMobile ? 0 : 6,
+          right: isMobile ? 0 : 6,
           top: 8,
           bottom: 2
         }
@@ -236,10 +271,10 @@ function initSplineChart() {
           },
           ticks: {
             color: 'rgba(255, 255, 255, 0.72)',
-            maxTicksLimit: 8,
+            maxTicksLimit: isMobile ? 4 : 8,
             maxRotation: 0,
-            padding: 8,
-            font: { family: 'Inter, sans-serif', size: 12.5, weight: '500' }
+            padding: tickPadding,
+            font: { family: 'Inter, sans-serif', size: tickFontSize, weight: '500' }
           }
         },
         yTemp: {
@@ -252,9 +287,9 @@ function initSplineChart() {
           },
           ticks: {
             precision: 0,
-            padding: 8,
+            padding: tickPadding,
             color: 'rgba(255, 255, 255, 0.85)',
-            font: { family: 'Inter, sans-serif', size: 12.5, weight: '500' },
+            font: { family: 'Inter, sans-serif', size: tickFontSize, weight: '500' },
             callback: function(value) {
               return `${Math.round(Number(value))}°C`;
             }
@@ -270,9 +305,9 @@ function initSplineChart() {
             drawBorder: false,
           },
           ticks: {
-            padding: 8,
+            padding: tickPadding,
             color: 'rgba(56, 189, 248, 0.9)',
-            font: { family: 'Inter, sans-serif', size: 12.5, weight: '500' },
+            font: { family: 'Inter, sans-serif', size: tickFontSize, weight: '500' },
             stepSize: 20,
             callback: function(value) {
               return `${value}%`;
@@ -281,6 +316,12 @@ function initSplineChart() {
         }
       }
     }
+  });
+
+  window.addEventListener('resize', () => {
+    if (!chartInstance) return;
+    applyChartResponsiveOptions();
+    chartInstance.update('none');
   });
 
   if (document.fonts && document.fonts.ready) {
@@ -435,6 +476,11 @@ async function fetchLatestSensorData() {
     }
 
     const data = await res.json();
+    if (!data || data.online === false) {
+      setConnectionState(false);
+      return;
+    }
+
     setConnectionState(true);
     updateKPIs(data);
 
@@ -850,14 +896,89 @@ function toggleSettingsModal(show) {
   }
 }
 
+let currentMobileUrl = '';
+
+async function loadMobileQrInfo() {
+  elMobileQrBox.innerHTML = '<div class="qr-loading">Đang dò IP WiFi và tạo mã QR...</div>';
+  elMobileQrUrl.textContent = '—';
+  currentMobileUrl = '';
+  elRefreshQrBtn.disabled = true;
+
+  try {
+    const port = window.location.port || '5000';
+    const res = await fetch(`${API_BASE_URL}/api/lan-info?port=${encodeURIComponent(port)}`, {
+      cache: 'no-store'
+    });
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error(
+        res.status === 404
+          ? 'Backend đang chạy là bản cũ. Hãy đóng cửa sổ cmd cũ rồi mở lại start.bat.'
+          : `Phản hồi không hợp lệ từ backend (HTTP ${res.status}).`
+      );
+    }
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Không lấy được địa chỉ LAN.');
+    }
+
+    currentMobileUrl = data.url;
+    elMobileQrUrl.textContent = data.url;
+    elMobileQrBox.innerHTML = data.qr_svg;
+  } catch (err) {
+    elMobileQrBox.innerHTML = `<div class="qr-loading">${escapeHtml(err.message || 'Lỗi tạo mã QR.')}</div>`;
+  } finally {
+    elRefreshQrBtn.disabled = false;
+  }
+}
+
+function toggleMobileQrModal(show) {
+  elMobileQrModal.classList.toggle('hidden', !show);
+  if (show) {
+    loadMobileQrInfo();
+  }
+}
+
 elSettingsBtn.addEventListener('click', () => toggleSettingsModal(true));
 elCloseSettingsBtn.addEventListener('click', () => toggleSettingsModal(false));
 elSettingsModal.addEventListener('click', (e) => {
   if (e.target === elSettingsModal) toggleSettingsModal(false);
 });
+if (elOpenMobileQrBtn) {
+  elOpenMobileQrBtn.addEventListener('click', () => toggleMobileQrModal(true));
+}
+if (elCloseMobileQrBtn) {
+  elCloseMobileQrBtn.addEventListener('click', () => toggleMobileQrModal(false));
+}
+if (elMobileQrModal) {
+  elMobileQrModal.addEventListener('click', (e) => {
+    if (e.target === elMobileQrModal) toggleMobileQrModal(false);
+  });
+}
+if (elRefreshQrBtn) {
+  elRefreshQrBtn.addEventListener('click', loadMobileQrInfo);
+}
+if (elCopyMobileUrlBtn) {
+  elCopyMobileUrlBtn.addEventListener('click', async () => {
+    if (!currentMobileUrl || !navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(currentMobileUrl);
+      elCopyMobileUrlBtn.textContent = 'Đã copy';
+      setTimeout(() => {
+        elCopyMobileUrlBtn.textContent = 'Copy';
+      }, 1500);
+    } catch (err) {
+      // Bo qua neu trinh duyet chan clipboard
+    }
+  });
+}
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !elSettingsModal.classList.contains('hidden')) {
+  if (e.key !== 'Escape') return;
+  if (!elSettingsModal.classList.contains('hidden')) {
     toggleSettingsModal(false);
+  }
+  if (elMobileQrModal && !elMobileQrModal.classList.contains('hidden')) {
+    toggleMobileQrModal(false);
   }
 });
 elWifiScanBtn.addEventListener('click', loadWifiModalData);

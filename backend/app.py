@@ -1,15 +1,20 @@
 from collections import deque
 from datetime import datetime
 from threading import Lock, Thread, Timer
+import io
 import json
 import os
+import socket
 import sqlite3
 import sys
 import time
 import urllib.request
+import uuid
 import webbrowser
 
 import paho.mqtt.client as mqtt
+import qrcode
+import qrcode.image.svg
 import serial
 import serial.tools.list_ports
 
@@ -311,6 +316,7 @@ def on_disconnect(client, userdata, flags, reason_code, properties):
     """Cập nhật trạng thái khi mất kết nối MQTT."""
     global mqtt_connected
     mqtt_connected = False
+    print(f"[MQTT] Disconnected from broker: {reason_code}")
 
 
 def on_message(client, userdata, msg):
@@ -370,7 +376,7 @@ def on_message(client, userdata, msg):
 
 mqtt_client = mqtt.Client(
     callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
-    client_id="weather-backend-giang",
+    client_id=f"weather-backend-{uuid.uuid4().hex[:8]}",
 )
 
 mqtt_client.on_connect = on_connect
@@ -399,6 +405,68 @@ def health_check():
         "status": "ok",
         "service": "weather-station-backend",
         "mqtt_connected": mqtt_connected,
+    })
+
+
+def _get_lan_ip():
+    """Tìm địa chỉ IPv4 LAN thực tế của laptop để điện thoại quét QR truy cập."""
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.settimeout(0.5)
+        sock.connect(("8.8.8.8", 80))
+        ip = sock.getsockname()[0]
+        sock.close()
+        if ip and not ip.startswith("127.") and not ip.startswith("169.254."):
+            return ip
+    except OSError:
+        pass
+
+    try:
+        infos = socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)
+        candidates = []
+        for info in infos:
+            addr = info[4][0]
+            if not addr.startswith("127.") and not addr.startswith("169.254."):
+                candidates.append(addr)
+        for prefix in ("192.168.", "10."):
+            for addr in candidates:
+                if addr.startswith(prefix):
+                    return addr
+        if candidates:
+            return candidates[0]
+    except OSError:
+        pass
+
+    return None
+
+
+@app.route("/api/lan-info", methods=["GET"])
+def get_lan_qr_info():
+    """Trả về IP LAN, URL truy cập và mã QR SVG cho điện thoại."""
+    port_raw = str(request.args.get("port", "5000")).strip()
+    port = int(port_raw) if port_raw.isdigit() else 5000
+
+    ip = _get_lan_ip()
+    if not ip:
+        return jsonify({
+            "error": "Laptop chưa kết nối WiFi hoặc mạng LAN."
+        }), 404
+
+    url = f"http://{ip}:{port}"
+    qr_img = qrcode.make(
+        url,
+        image_factory=qrcode.image.svg.SvgPathImage,
+        box_size=10,
+        border=2,
+    )
+    buf = io.BytesIO()
+    qr_img.save(buf)
+
+    return jsonify({
+        "ip": ip,
+        "port": port,
+        "url": url,
+        "qr_svg": buf.getvalue().decode("utf-8"),
     })
 
 
@@ -527,10 +595,14 @@ def get_latest_sensor_data():
 
     if data is None or (time.monotonic() - last_seen) > SENSOR_STALE_TIMEOUT:
         return jsonify({
+            "online": False,
             "message": "Chưa nhận được dữ liệu mới từ ESP32",
-        }), 404
+        }), 200
 
-    return jsonify(data)
+    return jsonify({
+        **data,
+        "online": True,
+    })
 
 
 @app.route("/api/sensor/recent", methods=["GET"])
@@ -720,7 +792,7 @@ if __name__ == "__main__":
     mqtt_client.connect_async(
         MQTT_HOST,
         MQTT_PORT,
-        keepalive=60,
+        keepalive=20,
     )
 
     mqtt_client.loop_start()
