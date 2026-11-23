@@ -1818,7 +1818,7 @@ body {
 
   .hero-canvas {
     padding: 16px;
-    min-height: 0;
+    min-height: calc(100svh - 16px);
     border-radius: 20px;
   }
 
