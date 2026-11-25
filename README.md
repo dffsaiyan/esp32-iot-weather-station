@@ -1,30 +1,45 @@
-# Enderwood IoT Weather Station (ESP32 + MQTT + Flask + SQLite)
+# Hệ Thống Trạm Quan Trắc Thời Tiết Mini (ESP32 IoT)
 
-Hệ thống trạm giám sát thời tiết thời gian thực sử dụng **ESP32-DevKit**, cảm biến **DHT11**, quang trở **LDR**, màn hình **OLED SSD1306**, **3 đèn LED**, **còi Buzzer**, giao tiếp 2 chiều qua **MQTT (`broker.emqx.io`)**, **Backend Flask + SQLite** và hỗ trợ đóng gói thành ứng dụng desktop Windows (`WeatherStation.exe`).
+Đồ án cuối kỳ môn **Hệ thống IoT và Ứng dụng**. Nhóm mình xây dựng một trạm đo thời tiết mini dùng **ESP32** đọc nhiệt độ, độ ẩm, ánh sáng theo thời gian thực, hiển thị cảnh báo tại chỗ và gửi dữ liệu lên giao diện web/điện thoại qua **MQTT**.
 
-## Tính năng chính
-- **Đo & cảnh báo tại chỗ (ESP32):**
-  - Nhiệt độ & độ ẩm (`DHT11`, GPIO 27), ánh sáng (`LDR`, GPIO 34).
-  - Hiển thị trực tiếp trên màn hình OLED I2C (`GPIO 21/22`) và phân mức cảnh báo bằng LED Xanh (`GPIO 26`) / Vàng (`GPIO 32`) / Đỏ (`GPIO 25`) + còi Buzzer (`GPIO 23`).
-  - Ngưỡng nhiệt độ: Cảnh báo `>= 33.0°C`, Nguy hiểm `>= 37.0°C`; Độ ẩm: Cảnh báo `>= 76%`, Nguy hiểm `>= 85%`.
-- **Cấu hình WiFi an toàn qua USB (RAM-only):**
-  - Tự động nhận cổng COM ESP32, quét WiFi 2.4GHz, xem WiFi đang kết nối, đổi mạng hoặc ngắt kết nối ngay trên giao diện Cài đặt.
-  - Dùng `WiFi.persistent(false)` — **không lưu mật khẩu WiFi** vào Flash/NVS của ESP32 hay file trên máy tính.
-- **Giám sát & điều khiển 2 chiều qua MQTT:**
-  - Tự động chuyển trạng thái `Offline` ↔ `Live` (quá 8 giây không có gói tin mới tự khóa về `Offline`).
-  - Biểu đồ 2 trục Y thời gian thực (`°C` và `%`), bảng lịch sử tự lưu vào **SQLite** (`weather_station.db`) mỗi 10 giây.
-  - Công tắc **Còi báo động** điều khiển 2 chiều qua MQTT (tự bật khi đạt ngưỡng Nguy hiểm, cho phép tắt/bật lại trong lúc Nguy hiểm, tự khóa khi hạ ngưỡng).
+## 1. Phần cứng & Sơ đồ nối chân (`src/main.cpp`)
+- **Vi điều khiển:** ESP32-DevKit
+- **Cảm biến & thiết bị ngoại vi:**
 
-## Sơ đồ chân ESP32 (`src/main.cpp`)
-| Thành phần | Chân trên ESP32 |
-|---|---|
-| DHT11 (DATA) | `GPIO 27` (`D27`) |
-| Cảm biến ánh sáng LDR (`DO`) | `GPIO 34` (`D34`) |
-| OLED SSD1306 (`SDA` / `SCL`) | `GPIO 21` (`D21`) / `GPIO 22` (`D22`) |
-| LED Xanh / Vàng / Đỏ | `GPIO 26` / `GPIO 32` / `GPIO 25` |
-| Còi Buzzer (`+`) | `GPIO 23` (`D23`) |
+| Linh kiện | Chân ESP32 | Ghi chú |
+|---|---|---|
+| Cảm biến nhiệt độ & độ ẩm **DHT11** | `GPIO 27` (`D27`) | Đọc mỗi 2 giây |
+| Cảm biến ánh sáng **LDR** (DO) | `GPIO 34` (`D34`) | Trả về trạng thái Sáng / Tối |
+| Màn hình **OLED SSD1306** (128x64, I2C `0x3C`) | `GPIO 21` (SDA), `GPIO 22` (SCL) | Hiện thông số và IP WiFi |
+| **LED Xanh / Vàng / Đỏ** | `GPIO 26` / `GPIO 32` / `GPIO 25` | Báo mức Ổn định / Cảnh báo / Nguy hiểm |
+| **Còi Buzzer** | `GPIO 23` (`D23`) | Kêu khi đạt mức Nguy hiểm |
 
-## Chạy & đóng gói
-- **Nạp firmware ESP32:** Mở project bằng PlatformIO và chạy Upload (`pio run -t upload`).
-- **Chạy chế độ Web trên máy:** Double-click `start.bat` (hoặc chạy `backend\.venv\Scripts\python.exe backend\app.py` và mở `http://localhost:5000`).
-- **Đóng gói app Desktop `.exe`:** Chạy `build_exe.bat` để xuất `dist\WeatherStation\WeatherStation.exe` và `dist\WeatherStation_Portable.zip`.
+## 2. Nguyên lý hoạt động & Tính năng
+- **Phân mức cảnh báo tự động:**
+  - **Ổn định (`NORMAL`):** Nhiệt độ `< 33°C` và Độ ẩm `< 76%` → LED xanh sáng, còi tắt.
+  - **Cảnh báo (`WARNING`):** Nhiệt độ `>= 33°C` hoặc Độ ẩm `>= 76%` → LED vàng sáng.
+  - **Nguy hiểm (`DANGER`):** Nhiệt độ `>= 37°C` hoặc Độ ẩm `>= 85%` → LED đỏ sáng, còi kêu.
+- **Cài đặt WiFi qua cổng USB (không lưu mật khẩu):**
+  - Cắm dây USB nối ESP32 với máy tính rồi vào mục **Cài đặt** trên web để chọn tên WiFi (2.4GHz) và nhập mật khẩu.
+  - Mạch dùng `WiFi.persistent(false)` nên mật khẩu chỉ nằm tạm trên RAM, rút điện là mất (tránh lộ mật khẩu và dễ đổi WiFi khi mang đi bảo vệ).
+- **Giao tiếp 2 chiều qua MQTT (`broker.emqx.io`, port `1883`):**
+  - ESP32 đẩy JSON lên topic `iot/esp32/weather/giang0811/data` mỗi `2` giây.
+  - Web gửi lệnh tắt/bật còi báo động xuống ESP32 qua topic `iot/esp32/weather/giang0811/control` khi hệ thống đang ở trạng thái Nguy hiểm.
+- **Web Dashboard, Lưu trữ SQLite & Xem trên điện thoại:**
+  - Backend **Flask** (`backend/app.py`) nhận dữ liệu MQTT, tự lưu lịch sử vào **SQLite** (`weather_station.db`) mỗi `10` giây và vẽ biểu đồ 2 trục tự co giãn. Nếu quá `8` giây không có tin mới từ mạch thì giao diện tự khóa về `Offline`.
+  - Giao diện tự co giãn cho màn hình điện thoại; trên web có nút **"Mở trên điện thoại"** tạo mã **QR** theo IP LAN của máy tính để điện thoại bắt chung WiFi quét vào xem và điều khiển trực tiếp.
+
+## 3. Cấu trúc thư mục chính
+```text
+├── src/main.cpp          # Code firmware cho ESP32 (PlatformIO / Arduino)
+├── include/config.h      # Ghi chú cấu hình WiFi (không hardcode mật khẩu)
+├── backend/app.py        # Server Flask, kết nối MQTT, SQLite, giao tiếp USB Serial & tạo QR
+├── frontend/             # Giao diện web (HTML/CSS/JS + Chart.js)
+├── start.bat             # Mở nhanh backend và trình duyệt web
+└── build_exe.bat         # Đóng gói thành app Windows (WeatherStation.exe)
+```
+
+## 4. Cách chạy nhanh
+1. **Nạp code ESP32:** Mở project bằng PlatformIO trên VS Code và bấm Upload (`pio run -t upload`).
+2. **Chạy trên máy tính:** Chạy file `start.bat` (trước đó cài môi trường Python trong `backend/.venv` theo `backend/requirements.txt`), trình duyệt sẽ mở tại `http://localhost:5000`.
+3. **Đóng gói app Desktop (tùy chọn):** Chạy `build_exe.bat` để tạo thư mục `dist/WeatherStation/WeatherStation.exe`.
